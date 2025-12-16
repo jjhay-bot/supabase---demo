@@ -13,8 +13,8 @@ create table if not exists posts (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   content text,
-  author_id uuid references auth.users(id),
-  is_private boolean not null default false, -- false = public
+  author_id uuid not null default auth.uid(), -- the authenticated user who owns the post
+  is_private boolean not null default false, -- false = public, true = private
   created_at timestamptz not null default now(),
   updated_at timestamptz
 );
@@ -371,3 +371,121 @@ In general, the workflow is:
 3. Update the `Post` type.
 4. Update CRUD helpers where needed.
 5. Adjust RLS **only** if access rules change.
+
+## Current `posts` schema (key columns)
+
+The `posts` table is assumed to have at least these columns:
+
+- `id uuid primary key default gen_random_uuid()`
+- `title text not null`
+- `content text`
+- `author_id uuid not null default auth.uid()` – the authenticated user who owns the post
+- `is_private boolean not null default false` – `false` = public, `true` = private
+- `created_at timestamptz not null default now()`
+- `updated_at timestamptz
+
+> Note: The important parts for RLS are `author_id` and `is_private`.
+
+## RLS: enabling and base setup
+
+RLS must be enabled on `posts`:
+
+```sql
+alter table public.posts enable row level security;
+```
+
+## RLS policies in use
+
+### 1) Public can read public posts
+
+This allows anyone (even not signed in) to read posts where `is_private = false`.
+
+```sql
+create policy "Public can view public posts"
+  on public.posts
+  for select
+  using (is_private = false);
+```
+
+This is what powers the `/posts` public feed together with the `listPublicPosts` helper, which also filters on `is_private = false` for clarity:
+
+```ts
+export async function listPublicPosts() {
+  const { data, error } = await supabase
+    .from("posts")
+    .select("*")
+    .eq("is_private", false)
+    .order("created_at", { ascending: false });
+
+  return { data: data as Post[] | null, error: error as Error | null };
+}
+```
+
+### 2) Authenticated users can insert their own posts
+
+`author_id` is now automatically filled from the user JWT via a column default. The policy only allows inserts where the row’s `author_id` matches `auth.uid()`:
+
+```sql
+-- Ensure the default is set
+alter table public.posts
+  alter column author_id set default auth.uid();
+
+-- Policy: only authenticated users may insert rows with their own author_id
+create policy "insert posts for auth users"
+  on public.posts
+  for insert
+  to authenticated
+  with check (auth.uid() = author_id);
+```
+
+Because of the default, the client **does not need to send `author_id`** in the payload. A typical insert from the app looks like:
+
+```ts
+await supabase
+  .from("posts")
+  .insert({
+    title: "Hello",
+    content: "test",
+    is_private: false,
+  })
+  .select()
+  .single();
+```
+
+If the user is logged in, Postgres will set `author_id = auth.uid()` and the policy will allow the insert. If the user is not authenticated, `auth.uid()` is `null` and the insert is rejected with `403`.
+
+### 3) Recommended owner-only update/delete policies
+
+To keep ownership consistent, only the author should be able to update or delete a post. You can define:
+
+```sql
+create policy "update own posts"
+  on public.posts
+  for update
+  to authenticated
+  using (auth.uid() = author_id)
+  with check (auth.uid() = author_id);
+
+create policy "delete own posts"
+  on public.posts
+  for delete
+  to authenticated
+  using (auth.uid() = author_id);
+```
+
+- `using` controls which rows are visible for the operation.
+- `with check` controls which new values are allowed on update.
+
+This pairs with app helpers such as `updatePost` and `deletePost`, which only need the post `id` and new values; `author_id` is never controlled by the client.
+
+## Typical 403 (Forbidden) causes and fixes
+
+- **403 on INSERT**
+  - Cause: `author_id` is `null` or does not equal `auth.uid()`; user is anonymous.
+  - Fix: ensure user is signed in and that `author_id` has default `auth.uid()` (or is explicitly set from `session.user.id`).
+
+- **403 on SELECT for public feed**
+  - Cause: missing `SELECT` policy for public posts.
+  - Fix: add `"Public can view public posts"` policy and/or filter by `is_private = false`.
+
+By centralizing the rules in RLS and using defaults (`author_id default auth.uid()`), the application code stays simple and cannot spoof ownership.

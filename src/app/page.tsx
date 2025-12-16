@@ -71,6 +71,12 @@ export default function Home() {
         <nav className="flex items-center gap-4 text-sm">
           <span className="text-gray-600">{session.user.email}</span>
           <Link
+            href="/posts"
+            className="rounded-md border px-3 py-1 text-gray-800 hover:bg-gray-50"
+          >
+            Public Posts
+          </Link>
+          <Link
             href="/profile"
             className="rounded-md border px-3 py-1 text-gray-800 hover:bg-gray-50"
           >

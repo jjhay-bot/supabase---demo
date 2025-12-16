@@ -21,6 +21,17 @@ if (!supabaseUrl || !supabaseKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Optional helper to get the current session (client-side)
+// This is a thin wrapper around supabase.auth.getSession for reuse.
+export async function getCurrentSession() {
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  return { session, error };
+}
+
 export async function signInWithOtp(email: string) {
   // Client-side email OTP / magic-link sign-in
   // See: https://supabase.com/docs/reference/javascript/auth-signinwithotp
@@ -128,4 +139,18 @@ export async function updatePost(
 export async function deletePost(id: string): Promise<{ error: Error | null }> {
   const { error } = await supabase.from("posts").delete().eq("id", id);
   return { error: error as Error | null };
+}
+
+// List only public posts (no auth required thanks to RLS)
+export async function listPublicPosts(): Promise<{
+  data: Post[] | null;
+  error: Error | null;
+}> {
+  const { data, error } = await supabase
+    .from("posts")
+    .select("*")
+    .eq("is_private", false)
+    .order("created_at", { ascending: false });
+
+  return { data: data as Post[] | null, error: error as Error | null };
 }
