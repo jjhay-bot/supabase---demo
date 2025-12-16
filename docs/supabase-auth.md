@@ -42,6 +42,55 @@ import { signOut } from '@/lib/supabaseClient';
 const { error } = await signOut();
 ```
 
+### Client-side session pattern (access + refresh tokens)
+
+On the client we use Supabase's built-in session handling:
+
+```ts
+const [session, setSession] = useState<Session | null>(null);
+const [loading, setLoading] = useState(true);
+
+useEffect(() => {
+  let mounted = true;
+
+  async function loadSession() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!mounted) return;
+    setSession(session);
+    setLoading(false);
+  }
+
+  loadSession();
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((_event, session) => {
+    setSession(session);
+  });
+
+  return () => {
+    mounted = false;
+    subscription.unsubscribe();
+  };
+}, []);
+```
+
+Notes:
+
+- `supabase.auth.getSession()` reads the current session (access + refresh
+  token) from the browser and returns `{ data: { session }, error }`.
+- Supabase JS client automatically refreshes access tokens when needed using
+  the refresh token; you do **not** need to manage refresh tokens yourself.
+- `supabase.auth.onAuthStateChange` fires on events like `SIGNED_IN`,
+  `SIGNED_OUT`, and `TOKEN_REFRESHED`, and we keep React state in sync by
+  calling `setSession(session)`.
+
+This pattern is used in `app/page.tsx` and `app/profile/page.tsx` to drive the
+UI based on whether the user is signed in.
+
 ## Posts CRUD helpers
 
 For the `posts` table schema, RLS policies, and detailed CRUD helper
