@@ -27,6 +27,10 @@ export default function ProfilePage() {
   const [formIsPrivate, setFormIsPrivate] = useState(false);
   const [formSubmitting, setFormSubmitting] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const pageSize = 2; // match DEFAULT_PAGE_SIZE
+
   useEffect(() => {
     let mounted = true;
 
@@ -41,9 +45,14 @@ export default function ProfilePage() {
 
       if (session?.user) {
         setPostsLoading(true);
-        const { data, error } = await listPosts({ authorId: session.user.id });
+        const { data, error, count } = await listPosts({
+          authorId: session.user.id,
+          page: currentPage,
+          pageSize,
+        });
         if (!mounted) return;
         if (!error) setPosts(data);
+        setTotalPages(count ? Math.max(1, Math.ceil(count / pageSize)) : 1);
         setPostsLoading(false);
       }
     }
@@ -60,12 +69,13 @@ export default function ProfilePage() {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [currentPage]);
 
   async function refreshPosts(userId: string) {
     setPostsLoading(true);
-    const { data, error } = await listPosts({ authorId: userId });
+    const { data, error, count } = await listPosts({ authorId: userId, page: currentPage, pageSize });
     if (!error) setPosts(data);
+    setTotalPages(count ? Math.max(1, Math.ceil(count / pageSize)) : 1);
     setPostsLoading(false);
   }
 
@@ -186,35 +196,56 @@ export default function ProfilePage() {
           )}
 
           {!postsLoading && posts && posts.length > 0 && (
-            <ul className="space-y-2">
-              {posts.map((post) => (
-                <li
-                  key={post.id}
-                  className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+            <>
+              <ul className="space-y-2">
+                {posts.map((post) => (
+                  <li
+                    key={post.id}
+                    className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                  >
+                    <div>
+                      <p className="font-medium">{post.title}</p>
+                      <p className="text-xs text-gray-500">
+                        {post.is_private ? "Private" : "Public"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <button
+                        onClick={() => openEditModal(post)}
+                        className="rounded border px-2 py-1 hover:bg-gray-50"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(post.id, user.id)}
+                        className="rounded border border-red-500 px-2 py-1 text-red-600 hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex justify-center mt-4 gap-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded border px-3 py-1 text-sm disabled:opacity-50"
                 >
-                  <div>
-                    <p className="font-medium">{post.title}</p>
-                    <p className="text-xs text-gray-500">
-                      {post.is_private ? "Private" : "Public"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <button
-                      onClick={() => openEditModal(post)}
-                      className="rounded border px-2 py-1 hover:bg-gray-50"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(post.id, user.id)}
-                      className="rounded border border-red-500 px-2 py-1 text-red-600 hover:bg-red-50"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  Previous
+                </button>
+                <span className="px-2 py-1 text-sm">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </>
           )}
         </div>
 
@@ -269,8 +300,8 @@ export default function ProfilePage() {
                   {formSubmitting
                     ? "Saving..."
                     : editingPost
-                    ? "Save changes"
-                    : "Create"}
+                      ? "Save changes"
+                      : "Create"}
                 </button>
               </div>
             </div>

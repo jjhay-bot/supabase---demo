@@ -489,3 +489,37 @@ This pairs with app helpers such as `updatePost` and `deletePost`, which only ne
   - Fix: add `"Public can view public posts"` policy and/or filter by `is_private = false`.
 
 By centralizing the rules in RLS and using defaults (`author_id default auth.uid()`), the application code stays simple and cannot spoof ownership.
+
+## 6. Pagination and Limit Support
+
+Both `listPosts` and `listPublicPosts` support pagination and limiting results using the `page`, `pageSize`, and `limit` options. This is handled in the TypeScript helpers and does not require any changes to your Supabase SQL schema or RLS policies.
+
+### Usage
+
+- **Paginate results:**
+
+  ```ts
+  // Get page 2, 5 posts per page
+  const { data, error } = await listPosts({ page: 2, pageSize: 5 });
+  ```
+
+- **Limit results:**
+
+  ```ts
+  // Get the first 3 public posts
+  const { data, error } = await listPublicPosts({ limit: 3 });
+  ```
+
+- **Combined with filters:**
+
+  ```ts
+  // Get the first page of another user's public posts, 10 per page
+  const { data } = await listPosts({ authorId: otherUserId, onlyPublic: true, page: 1, pageSize: 10 });
+  ```
+
+### Notes
+
+- If both `page`/`pageSize` and `limit` are provided, pagination takes precedence.
+- Pagination is 1-based (page 1 is the first page).
+- These options are implemented using Supabase's `.range()` and `.limit()` methods, which translate to SQL `LIMIT`/`OFFSET`.
+- No changes to your database schema or RLS are needed for pagination/limit support.

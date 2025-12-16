@@ -21,6 +21,9 @@ if (!supabaseUrl || !supabaseKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Default page size for pagination
+export const DEFAULT_PAGE_SIZE = 2;
+
 // Optional helper to get the current session (client-side)
 // This is a thin wrapper around supabase.auth.getSession for reuse.
 export async function getCurrentSession() {
@@ -76,28 +79,42 @@ export async function createPost(input: {
   return { data: data as Post | null, error: error as Error | null };
 }
 
-// Read: list posts (optionally by author)
+// Read: list posts (optionally by author, with pagination/limit and total count)
 export async function listPosts(options?: {
   authorId?: string;
   onlyPrivate?: boolean;
   onlyPublic?: boolean;
-}): Promise<{ data: Post[] | null; error: Error | null }> {
-  let query = supabase.from("posts").select("*").order("created_at", { ascending: false });
+  page?: number; // 1-based
+  pageSize?: number;
+  limit?: number;
+}): Promise<{ data: Post[] | null; error: Error | null; count: number | null }> {
+  let query = supabase
+    .from("posts")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false });
 
   if (options?.authorId) {
     query = query.eq("author_id", options.authorId);
   }
-
   if (options?.onlyPrivate) {
     query = query.eq("is_private", true);
   }
-
   if (options?.onlyPublic) {
     query = query.eq("is_private", false);
   }
 
-  const { data, error } = await query;
-  return { data: data as Post[] | null, error: error as Error | null };
+  // Pagination/limit logic
+  if (options?.page) {
+    const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
+    const from = (options.page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    query = query.range(from, to);
+  } else if (options?.limit) {
+    query = query.limit(options.limit);
+  }
+
+  const { data, error, count } = await query;
+  return { data: data as Post[] | null, error: error as Error | null, count: count ?? null };
 }
 
 // Read: get a single post by id
@@ -141,16 +158,30 @@ export async function deletePost(id: string): Promise<{ error: Error | null }> {
   return { error: error as Error | null };
 }
 
-// List only public posts (no auth required thanks to RLS)
-export async function listPublicPosts(): Promise<{
+// List only public posts (with pagination/limit)
+export async function listPublicPosts(options?: {
+  page?: number; // 1-based
+  pageSize?: number;
+  limit?: number;
+}): Promise<{
   data: Post[] | null;
   error: Error | null;
 }> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("posts")
     .select("*")
     .eq("is_private", false)
     .order("created_at", { ascending: false });
 
+  if (options?.page) {
+    const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
+    const from = (options.page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    query = query.range(from, to);
+  } else if (options?.limit) {
+    query = query.limit(options.limit);
+  }
+
+  const { data, error } = await query;
   return { data: data as Post[] | null, error: error as Error | null };
 }
