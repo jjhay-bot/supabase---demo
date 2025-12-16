@@ -3,14 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
-import { AuthForm } from "./AuthForm";
 
-export default function Home() {
+export default function ProfilePage() {
+  const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<
     Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"] | null
   >(null);
-  const [loading, setLoading] = useState(true);
-  console.log('session', session);
 
   useEffect(() => {
     let mounted = true;
@@ -19,8 +17,6 @@ export default function Home() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-
-      console.log('session', session);
 
       if (!mounted) return;
       setSession(session);
@@ -52,47 +48,42 @@ export default function Home() {
   if (!session) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-4">
-        <h1 className="mb-4 text-2xl font-bold">Welcome</h1>
-        <p className="mb-4 text-sm text-gray-600">
-          You are not signed in. Use the form below to sign in.
-        </p>
-        <AuthForm />
+        <p className="mb-4 text-sm text-gray-600">You need to sign in to view your profile.</p>
+        <Link
+          href="/"
+          className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white"
+        >
+          Go to sign in
+        </Link>
       </main>
     );
   }
 
+  const user = session.user;
+
   return (
     <main className="flex min-h-screen flex-col">
-      {/* Simple top nav */}
       <header className="flex items-center justify-between border-b px-4 py-3">
         <Link href="/" className="text-base font-semibold">
           Bucketmatch
         </Link>
         <nav className="flex items-center gap-4 text-sm">
-          <span className="text-gray-600">{session.user.email}</span>
-          <Link
-            href="/profile"
-            className="rounded-md border px-3 py-1 text-gray-800 hover:bg-gray-50"
-          >
+          <Link href="/profile" className="font-medium">
             Profile
           </Link>
-          <button
-            onClick={async () => {
-              await supabase.auth.signOut();
-            }}
-            className="rounded-md bg-black px-3 py-1 text-white hover:bg-gray-900"
-          >
-            Sign out
-          </button>
         </nav>
       </header>
 
-      {/* Page body */}
       <section className="flex flex-1 flex-col items-center justify-center p-4">
-        <h1 className="mb-4 text-2xl font-bold">You are signed in</h1>
-        <p className="mb-4 text-sm text-gray-600">
-          Signed in as {session.user.email}
-        </p>
+        <h1 className="mb-4 text-2xl font-bold">My Profile</h1>
+        <div className="space-y-2 text-sm text-gray-700">
+          <p>
+            <span className="font-semibold">User ID:</span> {user.id}
+          </p>
+          <p>
+            <span className="font-semibold">Email:</span> {user.email}
+          </p>
+        </div>
       </section>
     </main>
   );
