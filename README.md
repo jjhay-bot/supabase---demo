@@ -64,3 +64,12 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
   npm run dev
 
 The app will be available at http://localhost:3000.
+
+## Supabase notes
+
+- Env vars: set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` (anon) in `.env.local`. Use the service role key only on the server/CLI (never ship to the client).
+- Local stack: `supabase start` requires Docker Desktop running. Config lives in `supabase/config.toml`.
+- Pulling schema/RLS (no Docker needed): `supabase db pull --db-url "postgresql://postgres:<SERVICE_ROLE_KEY>@db.<project-ref>.supabase.co:6543/postgres?sslmode=require&hostaddr=<IPv4>"` or use `pg_dump --schema-only`.
+- Edge Functions: serverless Deno HTTPS endpoints at Supabase’s edge. Good for API logic, webhooks, cron. Can call Postgres/Storage/external APIs and verify Supabase JWTs.
+- DB triggers/functions: Postgres-side automation that runs inside transactions on insert/update/delete. Best for data integrity and fast row-level tasks; avoid external calls.
+- Branches: cloud-hosted, isolated copies of your Supabase project for feature/previews. Each has its own URL/keys and schema; GitHub link is required in the dashboard. Alternative: use separate projects or CLI migrations without branching.
