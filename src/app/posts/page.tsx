@@ -1,9 +1,30 @@
 import Link from "next/link";
-import { listPublicPosts, type Post } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 
-export default async function PublicPostsPage() {
-  const { data, error } = await listPublicPosts();
-  const posts = (data ?? []) as Post[];
+const PAGE_SIZE = 10;
+
+export default async function PublicPostsPage({
+  searchParams,
+}: {
+  searchParams?: { page?: string };
+}) {
+  const page = Math.max(1, Number(searchParams?.page) || 1);
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
+  // Fetch posts for the current page and get filtered count in one query
+  const { data: posts, error, count } = await supabase
+    .from("posts")
+    .select("*", { count: "exact" })
+    .eq("type", 1)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  const total = count || 0;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  console.log(posts, error, count);
+
 
   return (
     <main className="flex min-h-screen flex-col">
@@ -35,21 +56,50 @@ export default async function PublicPostsPage() {
         )}
 
         {!error && posts.length > 0 && (
-          <ul className="mt-2 w-full max-w-xl space-y-2">
-            {posts.map((post) => (
-              <li
-                key={post.id}
-                className="rounded-md border px-3 py-2 text-sm"
-              >
-                <p className="font-medium">{post.title}</p>
-                {post.content && (
-                  <p className="mt-1 text-xs text-gray-600 line-clamp-2">
-                    {post.content}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="mt-2 w-full max-w-xl space-y-2">
+              {posts.map((post) => (
+                <li
+                  key={post.id}
+                  className="rounded-md border px-3 py-2 text-sm"
+                >
+                  <p className="font-medium">{post.title}</p>
+                  {post.content && (
+                    <p className="mt-1 text-xs text-gray-600 line-clamp-2">
+                      {post.content}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-6 flex items-center gap-2">
+              <span className="text-xs text-gray-500">
+                Page {page} of {totalPages} ({total} posts)
+              </span>
+              <nav className="flex gap-1">
+                <Link
+                  href={`/posts?page=${page - 1}`}
+                  className={`px-2 py-1 text-xs rounded ${page <= 1
+                      ? "pointer-events-none opacity-50"
+                      : "hover:bg-gray-100"
+                    }`}
+                  aria-disabled={page <= 1}
+                >
+                  Prev
+                </Link>
+                <Link
+                  href={`/posts?page=${page + 1}`}
+                  className={`px-2 py-1 text-xs rounded ${page >= totalPages
+                      ? "pointer-events-none opacity-50"
+                      : "hover:bg-gray-100"
+                    }`}
+                  aria-disabled={page >= totalPages}
+                >
+                  Next
+                </Link>
+              </nav>
+            </div>
+          </>
         )}
       </section>
     </main>

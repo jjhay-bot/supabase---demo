@@ -1,0 +1,158 @@
+erDiagram
+    %% NOTE: The following tables are present in your schema but are not currently shown in the ERD diagram above.
+    %% You can review this list and decide which ones to add or how to link them in the future.
+    %%
+    %% Tables without explicit foreign key relationships: (can use as lookup or auxiliary tables)
+    %%   - admin_email
+    %%   - app_icons
+    %%   - bucket_list_filter
+    %%   - category_os
+    %%   - colours
+    %%   - default_goals
+    %%   - desc_placeholder_os
+    %%   - do_you_already_have_a_bucket_list
+    %%   - doc_extensions
+    %%   - email_logs
+    %%   - email_type
+    %%   - follow
+    %%   - handle_new_auth_user_debug
+    %%   - how_did_you_hear_about_us
+    %%   - image_extension
+    %%   - index_tab
+    %%   - message_recs_os
+    %%   - message_recs_os_2
+    %%   - novels
+    %%   - os_buckets
+    %%   - pages
+    %%   - popup_goal_tabs
+    %%   - post_type_os
+    %%   - range_os
+    %%   - sample_file_csv
+    %%   - status_bar
+    %%   - sub_pointers
+    %%   - subscription_plan
+    %%   - testimonials
+    %%   - tests
+    %%   - title_placeholder_os
+    %%   - type_of_notifications
+    %%   - user_metadata_sync
+    %%   - user_sync_queue
+    %%   - vid_extensions
+    %%   - what_inspired_you_to_sign_up
+    %%
+    %% You can add these tables to the ERD as needed, and define relationships as your schema evolves.
+    users {
+        bigint id PK
+        text uid
+        text city
+        text profile_picture_url
+        text bio
+        text state_us_only
+        text country
+        text tiktok
+        text linkedin
+        text full_name
+        text instagram
+        integer goal_count_trigger
+        boolean welcome_email_sent
+        boolean first_goal_added
+        boolean is_confirmed
+        boolean is_onboarded
+        integer onboarding_step
+        boolean welcome_message_sent
+        text email
+        text slug
+        timestamp created_at
+        timestamp updated_at
+        uuid auth_user_id
+        timestamp last_personalized_bucket_flow_at
+    }
+    buckets {
+        bigint id PK
+        text uid
+        text title
+        text description
+        date completion_date
+        boolean is_completed
+        boolean is_private
+        bigint related_user_id FK
+        text user_name
+        integer added_count
+        integer like_count
+        integer comment_count
+        boolean storyboard
+        text display_picture_url
+        text location
+        boolean custom_explore
+        boolean experts_added
+        boolean services_added
+        boolean personalized_email
+        text completion_range
+        text creator
+        bigint created_by FK
+        timestamp created_at
+        timestamp updated_at
+        text related_user_email
+        bigint category FK
+        boolean is_system_bucket
+    }
+    collaborators {
+        bigint id PK
+        text uid
+        bigint related_user_id FK
+        bigint related_bucket_id FK
+        boolean approved_by_creator
+        boolean approved_by_collaborator
+        text creator
+        bigint created_by FK
+        timestamp created_at
+        timestamp updated_at
+        text related_user_email
+        text related_bucket_uid
+    }
+    posts {
+        bigint id PK
+        text uid
+        text name
+        text title
+        text image_url
+        text context
+        bigint related_user_id FK
+        bigint related_bucket_id FK
+        bigint type FK
+        text creator
+        bigint created_by FK
+        timestamp created_at
+        timestamp updated_at
+        text related_user_email
+        text related_bucket_uid
+        text type_text
+    }
+    follows {
+        bigint id PK
+        text uid
+        bigint following_id FK
+        bigint followed_by_id FK
+        text creator
+        bigint created_by FK
+        timestamp created_at
+        timestamp updated_at
+        text following_email
+        text followed_by_email
+    }
+    
+    collaborators ||--o{ users : "related_user_id"
+    collaborators ||--o{ buckets : "related_bucket_id"
+    buckets ||--o{ users : "related_user_id"
+    posts ||--o{ users : "related_user_id"
+    posts ||--o{ buckets : "related_bucket_id"
+    buckets ||--o{ users : "created_by"
+    collaborators ||--o{ users : "created_by"
+    posts ||--o{ users : "created_by"
+    follows ||--o{ users : "following_id"
+    follows ||--o{ users : "followed_by_id"
+    follows ||--o{ users : "created_by"
+
+%% The symbols ||--o{ represent the relationship type:
+%% || means "one"
+%% o{ means "many, optional" 
